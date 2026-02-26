@@ -3,6 +3,12 @@ pipeline {
 
     stages {
 
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Build Backend Image') {
             steps {
                 sh '''
@@ -22,8 +28,8 @@ pipeline {
                 docker run -d --name backend1 --network app-network backend-app
                 docker run -d --name backend2 --network app-network backend-app
 
-                # Wait for backend containers to fully start
-                sleep 10
+                # Wait for backend startup
+                sleep 8
                 '''
             }
         }
@@ -37,17 +43,11 @@ pipeline {
                   --name nginx-lb \
                   --network app-network \
                   -p 80:80 \
+                  -v $WORKSPACE/nginx/default.conf:/etc/nginx/conf.d/default.conf \
                   nginx
 
                 # Wait for nginx startup
-                sleep 10
-
-                docker cp nginx/default.conf nginx-lb:/etc/nginx/conf.d/default.conf
-
-                # Small delay before reload
-                sleep 3
-
-                docker exec nginx-lb nginx -s reload
+                sleep 5
                 '''
             }
         }
