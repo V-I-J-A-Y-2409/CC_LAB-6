@@ -1,14 +1,24 @@
 pipeline {
     agent any
+
     stages {
+
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
         stage('Build Backend Image') {
             steps {
                 sh '''
+                ls -l
                 docker rmi -f backend-app || true
-                sh 'docker build -t backend-app backend'
+                docker build -t backend-app backend
                 '''
             }
         }
+
         stage('Deploy Backend Containers') {
             steps {
                 sh '''
@@ -19,29 +29,14 @@ pipeline {
                 '''
             }
         }
+
         stage('Deploy NGINX Load Balancer') {
             steps {
                 sh '''
                 docker rm -f nginx-lb || true
-                
-                docker run -d \
-                  --name nginx-lb \
-                  --network app-network \
-                  -p 80:80 \
-                  nginx
-                
-                docker cp CC_LAB-6/nginx/default.conf nginx-lb:/etc/nginx/conf.d/default.conf
-                docker exec nginx-lb nginx -s reload
+                docker run -d --name nginx-lb --network app-network -p 80:80 nginx
                 '''
             }
-        }
-    }
-    post {
-        success {
-            echo 'Pipeline executed successfully. NGINX load balancer is running.'
-        }
-        failure {
-            echo 'Pipeline failed. Check console logs for errors.'
         }
     }
 }
