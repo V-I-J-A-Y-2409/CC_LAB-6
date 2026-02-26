@@ -3,16 +3,9 @@ pipeline {
 
     stages {
 
-        stage('Checkout Code') {
-            steps {
-                checkout scm
-            }
-        }
-
         stage('Build Backend Image') {
             steps {
                 sh '''
-                ls -l
                 docker rmi -f backend-app || true
                 docker build -t backend-app backend
                 '''
@@ -23,9 +16,14 @@ pipeline {
             steps {
                 sh '''
                 docker network create app-network || true
+
                 docker rm -f backend1 backend2 || true
+
                 docker run -d --name backend1 --network app-network backend-app
                 docker run -d --name backend2 --network app-network backend-app
+
+                # Wait for backend containers to fully start
+                sleep 10
                 '''
             }
         }
@@ -34,9 +32,33 @@ pipeline {
             steps {
                 sh '''
                 docker rm -f nginx-lb || true
-                docker run -d --name nginx-lb --network app-network -p 80:80 nginx
+
+                docker run -d \
+                  --name nginx-lb \
+                  --network app-network \
+                  -p 80:80 \
+                  nginx
+
+                # Wait for nginx startup
+                sleep 10
+
+                docker cp nginx/default.conf nginx-lb:/etc/nginx/conf.d/default.conf
+
+                # Small delay before reload
+                sleep 3
+
+                docker exec nginx-lb nginx -s reload
                 '''
             }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline executed successfully. NGINX load balancer is running.'
+        }
+        failure {
+            echo 'Pipeline failed. Check console logs for errors.'
         }
     }
 }
